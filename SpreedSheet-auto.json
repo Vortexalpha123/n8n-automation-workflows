@@ -1,0 +1,202 @@
+{
+  "name": "SpreedSheet-auto",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "8dcf9941-aad2-4a4a-8bd6-a0e5ec20d535",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -304,
+        0
+      ],
+      "id": "98271351-7b34-42c7-8f99-ce4a1882e948",
+      "name": "Webhook",
+      "webhookId": "8dcf9941-aad2-4a4a-8bd6-a0e5ec20d535"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const body = item.json.body;\n  \n  return {\n    json: {\n      sku:         body.sku?.trim() || '',\n      name:        body.name?.trim() || '',\n      category:    body.category?.toLowerCase().trim() || 'uncategorized',\n      price:       parseFloat(body.price) || 0,\n      description: body.description?.trim() || '',\n      needsAI:     !body.description || body.description.trim().length < 50\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "4cebdd08-ce26-43e4-a3a1-716a37768cdf",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3a7c3e3a-0913-476f-bfa6-b1f37756d8bb",
+              "leftValue": "={{ $json.needsAI }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        112,
+        0
+      ],
+      "id": "e1cae083-fe61-47fe-a2c0-ca540158b0c2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value":"Bearer YOUR_OPENAI_API_KEY"
+            {
+              "name": "content-type ",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"max_tokens\": 512,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"You are a product copywriter. Write a compelling 2-sentence product description for:\\n\\nProduct name: {{ $json.name }}\\nCategory: {{ $json.category }}\\nPrice: ${{ $json.price }}\\n\\nRules:\\n- Focus on benefits not features\\n- Use active voice\\n- Do NOT include the price\\n- Return ONLY the description text, nothing else\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        400,
+        -112
+      ],
+      "id": "1a699bee-e693-4431-8b0b-4d34f9c09f87",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  return {\n    json: {\n      sku:           item.json.body?.sku || $('Code in JavaScript').first().json.sku,\n      name:          $('Code in JavaScript').first().json.name,\n      category:      $('Code in JavaScript').first().json.category,\n      price:         $('Code in JavaScript').first().json.price,\n      aiDescription: item.json.choices[0].message.content.trim()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        -112
+      ],
+      "id": "f19e473e-f2fa-4f39-85eb-632ccd8b7434",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        816,
+        -112
+      ],
+      "id": "b7e27588-160f-4e1c-935d-0eaf6b75c7e5",
+      "name": "Create spreadsheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "Your Google Sheets ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Create spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d06a1eff-1cdf-477a-b3b4-2755ca8ed8a4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f823ec6a23f319bbee14602a913acdc964e34d240648ec0f51375b386c362e8d"
+  },
+  "id": "ctzL4BuuGyLavnr8",
+  "tags": []
+}
